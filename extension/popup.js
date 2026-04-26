@@ -139,3 +139,112 @@ $("#audit").addEventListener("click", async () => {
 });
 
 loadProfile();
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    document.getElementById("tab-tools").classList.toggle("hidden", tab !== "tools");
+    document.getElementById("tab-chat").classList.toggle("hidden", tab !== "chat");
+    if (tab === "chat") $("#chat-input").focus();
+  });
+});
+
+/* ---------- chat ---------- */
+const CHAT_KEY = "chat_history";
+let chatHistory = [];
+
+function renderChat() {
+  const log = $("#chat-log");
+  log.innerHTML = "";
+  if (!chatHistory.length) {
+    const empty = document.createElement("div");
+    empty.className = "chat-empty";
+    empty.textContent = "Say hi to the agent 👋";
+    log.appendChild(empty);
+    return;
+  }
+  for (const m of chatHistory) {
+    const div = document.createElement("div");
+    div.className = `chat-msg ${m.role}${m.error ? " error" : ""}`;
+    div.textContent = m.content;
+    log.appendChild(div);
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+async function loadChat() {
+  const data = await chrome.storage.local.get(CHAT_KEY);
+  chatHistory = Array.isArray(data[CHAT_KEY]) ? data[CHAT_KEY] : [];
+  renderChat();
+}
+
+async function saveChat() {
+  await chrome.storage.local.set({ [CHAT_KEY]: chatHistory.slice(-40) });
+}
+
+$("#chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("#chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const sendBtn = $("#chat-send");
+  sendBtn.disabled = true;
+  input.value = "";
+
+  chatHistory.push({ role: "user", content: text });
+  renderChat();
+
+  // Typing indicator
+  chatHistory.push({ role: "agent", content: "…", pending: true });
+  renderChat();
+
+  try {
+    const { profile = "" } = await chrome.storage.local.get("profile");
+    const messagesForAgent = chatHistory
+      .filter((m) => !m.pending)
+      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content }));
+
+    const res = await chrome.runtime.sendMessage({
+      type: "AI_CHAT",
+      payload: { messages: messagesForAgent, profile },
+    });
+
+    chatHistory = chatHistory.filter((m) => !m.pending);
+    if (res?.ok) {
+      chatHistory.push({ role: "agent", content: res.reply });
+    } else {
+      chatHistory.push({
+        role: "agent",
+        content: res?.error || "Something went wrong.",
+        error: true,
+      });
+    }
+    await saveChat();
+    renderChat();
+  } catch (err) {
+    chatHistory = chatHistory.filter((m) => !m.pending);
+    chatHistory.push({ role: "agent", content: String(err.message || err), error: true });
+    renderChat();
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+});
+
+$("#chat-clear").addEventListener("click", async () => {
+  chatHistory = [];
+  await saveChat();
+  renderChat();
+});
+
+$("#chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    $("#chat-form").requestSubmit();
+  }
+});
+
+loadChat();

@@ -147,6 +147,38 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true; // async
   }
+
+  if (msg?.type === "AI_CHAT") {
+    (async () => {
+      const { messages = [], profile = "" } = msg.payload || {};
+      const history = messages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n");
+      const prompt = [
+        "You are Umabonakude, a friendly AI assistant focused on accessibility,",
+        "form-filling, and helping users get things done on the web.",
+        "Reply in a clear, concise, conversational tone.",
+        "",
+        profile?.trim() ? `USER PROFILE:\n${profile.trim()}\n` : "",
+        "CONVERSATION:",
+        history,
+        "Assistant:",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      try {
+        const text = await callAgent(prompt);
+        const reply = String(text || "").replace(/^Assistant:\s*/i, "").trim();
+        sendResponse({ ok: true, reply: reply || "(empty response)" });
+      } catch (e) {
+        sendResponse({
+          ok: false,
+          error: `Agent unreachable: ${String(e.message || e)}`,
+        });
+      }
+    })();
+    return true; // async
+  }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
