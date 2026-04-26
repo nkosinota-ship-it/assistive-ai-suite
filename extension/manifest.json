@@ -6,7 +6,7 @@
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [
     "<all_urls>",
-    "https://sphahh222-umabonaude.hf.space/*"
+    "https://sphahh222-umabonakude.hf.space/*"
   ],
   "action": {
     "default_popup": "popup.html",
