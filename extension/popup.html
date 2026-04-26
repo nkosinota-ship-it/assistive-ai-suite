@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Umabonakude</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="hdr">
+      <img src="icons/icon48.png" alt="" width="32" height="32" />
+      <div>
+        <h1>Umabonakude</h1>
+        <p class="muted">AI Form Filler & Accessibility</p>
+      </div>
+    </header>
+
+    <section class="profile">
+      <h2>Your profile</h2>
+      <p class="muted small">Used as context when the agent generates field values. Stored locally.</p>
+      <textarea id="profile" rows="5" placeholder="e.g. Name: Sipho Dlamini, Email: sipho@example.com, Phone: +27 82 555 0142, Address: 14 Long St, Cape Town, Occupation: Designer, Preferences: short answers, polite tone."></textarea>
+      <button id="save-profile" class="ghost">Save profile</button>
+    </section>
+
+    <section class="actions">
+      <button id="scan" class="primary">
+        <span class="dot blue"></span> Scan page (Blue agent)
+      </button>
+      <button id="fill" class="primary">
+        <span class="dot red"></span> Fill all fields (Red agent)
+      </button>
+      <button id="audit" class="ghost">Accessibility audit</button>
+    </section>
+
+    <section class="status">
+      <div id="status">Idle.</div>
+      <ul id="results"></ul>
+    </section>
+
+    <footer>
+      <span class="muted small">Powered by Umabonakude on Hugging Face</span>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
