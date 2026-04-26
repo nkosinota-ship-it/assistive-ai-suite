@@ -52,6 +52,19 @@ $("#save-profile").addEventListener("click", async () => {
   setStatus("Profile saved.", "ok");
 });
 
+/* ---------- endpoint ---------- */
+async function loadEndpoint() {
+  const { agent_endpoint = "" } = await chrome.storage.local.get("agent_endpoint");
+  const el = document.getElementById("endpoint");
+  if (el) el.value = agent_endpoint;
+}
+document.getElementById("save-endpoint")?.addEventListener("click", async () => {
+  const val = document.getElementById("endpoint").value.trim();
+  await chrome.storage.local.set({ agent_endpoint: val });
+  setStatus(val ? `Endpoint saved: ${val}` : "Endpoint cleared (using default).", "ok");
+});
+loadEndpoint();
+
 /* ---------- scan ---------- */
 $("#scan").addEventListener("click", async () => {
   setStatus("Scanning page for form fields…");
