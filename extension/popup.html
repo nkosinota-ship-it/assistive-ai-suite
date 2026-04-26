@@ -22,20 +22,42 @@
       <button id="save-profile" class="ghost">Save profile</button>
     </section>
 
-    <section class="actions">
-      <button id="scan" class="primary">
-        <span class="dot blue"></span> Scan page (Blue agent)
-      </button>
-      <button id="fill" class="primary">
-        <span class="dot red"></span> Fill all fields (Red agent)
-      </button>
-      <button id="audit" class="ghost">Accessibility audit</button>
-    </section>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="tools" role="tab">Tools</button>
+      <button class="tab" data-tab="chat" role="tab">Chat with Agent</button>
+    </nav>
 
-    <section class="status">
-      <div id="status">Idle.</div>
-      <ul id="results"></ul>
-    </section>
+    <div id="tab-tools" class="tab-panel">
+      <section class="actions">
+        <button id="scan" class="primary">
+          <span class="dot blue"></span> Scan page (Blue agent)
+        </button>
+        <button id="fill" class="primary">
+          <span class="dot red"></span> Fill all fields (Red agent)
+        </button>
+        <button id="audit" class="ghost">Accessibility audit</button>
+      </section>
+
+      <section class="status">
+        <div id="status">Idle.</div>
+        <ul id="results"></ul>
+      </section>
+    </div>
+
+    <div id="tab-chat" class="tab-panel hidden">
+      <section class="chat">
+        <h2>Chat with Umabonakude</h2>
+        <p class="muted small">Ask the agent anything — uses your profile as context.</p>
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form">
+          <textarea id="chat-input" rows="2" placeholder="Type a message…" required></textarea>
+          <div class="chat-row">
+            <button type="button" id="chat-clear" class="ghost">Clear</button>
+            <button type="submit" id="chat-send" class="primary">Send</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <footer>
       <span class="muted small">Powered by Umabonakude on Hugging Face</span>
