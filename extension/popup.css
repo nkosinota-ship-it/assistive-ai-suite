@@ -46,6 +46,20 @@ textarea {
 }
 textarea:focus { outline: 2px solid var(--primary); border-color: transparent; }
 
+input[type="url"], input[type="text"] {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  font-family: inherit;
+  margin: 6px 0;
+  box-sizing: border-box;
+}
+input[type="url"]:focus, input[type="text"]:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
 .actions { display: flex; flex-direction: column; gap: 8px; }
 button {
   width: 100%;

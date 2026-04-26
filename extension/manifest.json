@@ -6,7 +6,8 @@
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [
     "<all_urls>",
-    "https://sphahh222-umabonakude.hf.space/*"
+    "https://*.hf.space/*",
+    "https://*.gradio.live/*"
   ],
   "action": {
     "default_popup": "popup.html",
