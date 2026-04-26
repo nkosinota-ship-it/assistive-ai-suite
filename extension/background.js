@@ -1,7 +1,9 @@
 /* Umabonakude background service worker — talks to the HF Space agent. */
 
-const HF_SPACE = "https://sphahh222-umabonaude.hf.space";
-const FN_NAME = "generate_text"; // exposed Gradio function
+// NOTE: correct subdomain has the "k" (UMABONAKUDE).
+const HF_SPACE = "https://sphahh222-umabonakude.hf.space";
+// Gradio 6.x exposes /gradio_api/call/<api_name>; the Space uses ChatInterface → "respond".
+const FN_NAME = "respond";
 
 /** Build the prompt the agent will see. */
 function buildPrompt({ url, title, profile, fields }) {
@@ -37,35 +39,60 @@ function buildPrompt({ url, title, profile, fields }) {
   ].join("\n");
 }
 
-/** Try Gradio /run/predict, then /api/predict, then /call/<fn>. Return text. */
-async function callAgent(prompt) {
-  const endpoints = [
-    { url: `${HF_SPACE}/run/${FN_NAME}`, body: { data: [prompt] } },
-    { url: `${HF_SPACE}/run/predict`, body: { data: [prompt], fn_index: 0 } },
-    { url: `${HF_SPACE}/api/predict`, body: { data: [prompt], fn_index: 0 } },
-  ];
-  let lastErr = null;
-  for (const ep of endpoints) {
-    try {
-      const r = await fetch(ep.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ep.body),
-      });
-      if (!r.ok) {
-        lastErr = new Error(`${ep.url} → ${r.status}`);
-        continue;
+/** Read a Gradio SSE stream from /gradio_api/call/<fn>/<event_id>. */
+async function readGradioStream(eventId) {
+  const r = await fetch(`${HF_SPACE}/gradio_api/call/${FN_NAME}/${eventId}`);
+  if (!r.ok || !r.body) throw new Error(`Stream HTTP ${r.status}`);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let lastEvent = "";
+  let lastDataRaw = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      if (line.startsWith("event:")) lastEvent = line.slice(6).trim();
+      else if (line.startsWith("data:")) lastDataRaw = line.slice(5).trim();
+      if (lastEvent === "complete" && lastDataRaw) {
+        try {
+          const parsed = JSON.parse(lastDataRaw);
+          const out = Array.isArray(parsed) ? parsed[0] : parsed;
+          return typeof out === "string" ? out : JSON.stringify(out);
+        } catch {
+          return lastDataRaw;
+        }
       }
-      const j = await r.json();
-      const data = j?.data ?? j?.output?.data ?? j;
-      const text = Array.isArray(data) ? data[0] : data;
-      if (typeof text === "string" && text.length) return text;
-      lastErr = new Error("Empty response");
-    } catch (e) {
-      lastErr = e;
+      if (lastEvent === "error") {
+        throw new Error(`Agent error: ${lastDataRaw || "unknown"}`);
+      }
     }
   }
-  throw lastErr || new Error("All agent endpoints failed");
+  throw new Error("Stream ended without 'complete' event");
+}
+
+/**
+ * Call the Space's ChatInterface "respond" endpoint.
+ * Signature: (message, system_message, max_tokens, temperature, top_p)
+ */
+async function callAgent(prompt, systemMessage = "You are a helpful assistant.") {
+  const r = await fetch(`${HF_SPACE}/gradio_api/call/${FN_NAME}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      data: [prompt, systemMessage, 512, 0.7, 0.95],
+    }),
+  });
+  if (!r.ok) throw new Error(`POST ${FN_NAME} → HTTP ${r.status}`);
+  const j = await r.json();
+  const eventId = j?.event_id;
+  if (!eventId) throw new Error("No event_id returned by Space");
+  return await readGradioStream(eventId);
 }
 
 /** Extract the first JSON array from a free-form string. */
@@ -117,7 +144,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const { fields = [], profile = "" } = msg.payload || {};
       try {
         const prompt = buildPrompt(msg.payload);
-        const text = await callAgent(prompt);
+        const text = await callAgent(
+          prompt,
+          "You are a precise form-filling assistant. Reply ONLY with the requested JSON array."
+        );
         const parsed = parseJsonArray(text);
         if (Array.isArray(parsed) && parsed.length) {
           // Keep only known ids
@@ -151,23 +181,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "AI_CHAT") {
     (async () => {
       const { messages = [], profile = "" } = msg.payload || {};
+      // Build a single user message (the Space's /respond endpoint takes one
+      // message + a system prompt; we fold conversation history into the message).
       const history = messages
+        .slice(0, -1)
         .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
         .join("\n");
-      const prompt = [
+      const lastUser = messages[messages.length - 1]?.content || "";
+      const userMessage = history
+        ? `Previous conversation:\n${history}\n\nNew message from user:\n${lastUser}`
+        : lastUser;
+      const systemMessage = [
         "You are Umabonakude, a friendly AI assistant focused on accessibility,",
         "form-filling, and helping users get things done on the web.",
         "Reply in a clear, concise, conversational tone.",
-        "",
-        profile?.trim() ? `USER PROFILE:\n${profile.trim()}\n` : "",
-        "CONVERSATION:",
-        history,
-        "Assistant:",
-      ]
-        .filter(Boolean)
-        .join("\n");
+        profile?.trim() ? `\nUSER PROFILE:\n${profile.trim()}` : "",
+      ].join(" ");
       try {
-        const text = await callAgent(prompt);
+        const text = await callAgent(userMessage, systemMessage);
         const reply = String(text || "").replace(/^Assistant:\s*/i, "").trim();
         sendResponse({ ok: true, reply: reply || "(empty response)" });
       } catch (e) {
